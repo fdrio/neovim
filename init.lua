@@ -18,6 +18,7 @@ vim.opt.ignorecase = true
 vim.opt.smartcase = true
 vim.opt.showmode = false
 vim.opt.list = true
+vim.opt.cursorline = true
 -- eol = '↵'
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣', }
 vim.opt.hlsearch = true
@@ -80,6 +81,8 @@ vim.pack.add({
 	{ src = "https://github.com/saadparwaiz1/cmp_luasnip" },
 	{ src = "https://github.com/rafamadriz/friendly-snippets" },
 	{ src = "https://github.com/kdheepak/cmp-latex-symbols" },
+	-- Treesitter
+	{ src = "https://github.com/nvim-treesitter/nvim-treesitter" },
 
 	-- Formatting
 	{ src = "https://github.com/stevearc/conform.nvim" },
@@ -87,11 +90,18 @@ vim.pack.add({
 	-- Utils
 	{ src = "https://github.com/s1n7ax/nvim-search-and-replace" },
 	{ src = "https://github.com/lervag/vimtex" },
+
+	-- Markdown
 	{ src = "https://github.com/MeanderingProgrammer/render-markdown.nvim" },
+
+	-- Math
 	{ src = "https://github.com/Thiago4532/mdmath.nvim" },
 
+	-- Quarto
+	{ src = "https://github.com/quarto-dev/quarto-nvim" },
+	{ src = "https://github.com/jmbuhr/otter.nvim" },
+	{ src = "https://github.com/Vigemus/iron.nvim" },
 })
-
 -- ========================================
 -- COLORSCHEME
 -- ========================================
@@ -111,6 +121,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
 		wk.add({
 			{ "<leader>c",        group = "[C]ode" },
 			{ "<leader>c_",       hidden = true },
+			{ "<leader>cq",       group = "[Q]uarto" },
 			{ "<leader>d",        group = "[D]ocument" },
 			{ "<leader>d_",       hidden = true },
 			{ "<leader>g",        group = "[G]rep replace" },
@@ -144,7 +155,28 @@ vim.api.nvim_create_autocmd("VimEnter", {
 -- ========================================
 -- LUALINE
 -- ========================================
+local function solid_theme()
+	local hl = vim.api.nvim_get_hl(0, { name = "CursorLine", link = false })
+	local bg = hl.bg and string.format("#%06x", hl.bg) or "#2d2d2d"
+	local fg = "#c5c9c5"
+	local section = { a = { bg = bg, fg = fg }, b = { bg = bg, fg = fg }, c = { bg = bg, fg = fg } }
+	return {
+		normal = section,
+		insert = section,
+		visual = section,
+		replace = section,
+		command = section,
+		inactive =
+		    section
+	}
+end
+
 require("lualine").setup({
+	options = {
+		theme = solid_theme(),
+		component_separators = "",
+		section_separators = "",
+	},
 	sections = {
 		lualine_c = {
 			{ "filename", path = 1 },
@@ -477,3 +509,97 @@ require("conform").setup({
 vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 vim.opt.foldlevel = 99
+
+-- ========================================
+-- IRON.NVIM (REPL RUNNER)
+-- ========================================
+local iron = require("iron.core")
+
+iron.setup({
+	config = {
+		repl_definition = {
+			python = {
+				command = { "python3" },
+			},
+			r = {
+				command = { "R" },
+			},
+			julia = {
+				command = { "julia" },
+			},
+			sh = {
+				command = { "bash" },
+			},
+		},
+		repl_open_cmd = require("iron.view").split.vertical.botright(0.4),
+	},
+	keymaps = {
+		send_motion = "<space>sc",
+		visual_send = "<space>sc",
+		send_file = "<space>sf",
+		send_line = "<space>sl",
+	},
+})
+
+-- ========================================
+-- QUARTO
+-- ========================================
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "quarto", "rmd" },
+	callback = function()
+		pcall(vim.cmd, "packadd quarto-nvim")
+
+		local ok, quarto = pcall(require, "quarto")
+		if not ok then
+			return
+		end
+
+		quarto.setup({
+			debug = false,
+			closePreviewOnExit = true,
+			lspFeatures = {
+				enabled = true,
+				chunks = "curly",
+				languages = { "r", "python", "julia", "bash", "html" },
+				diagnostics = {
+					enabled = true,
+					triggers = { "BufWritePost" },
+				},
+				completion = {
+					enabled = true,
+				},
+			},
+			codeRunner = {
+				enabled = true,
+				default_method = "iron", -- CHANGE THIS
+				ft_runners = {
+					python = "iron",
+				},
+				never_run = { "yaml" },
+			},
+		})
+
+		local runner = require("quarto.runner")
+
+		-- Preview
+		vim.keymap.set("n", "<leader>cqp", require("quarto").quartoPreview, {
+			desc = "Quarto preview",
+		})
+
+		-- Execution
+		vim.keymap.set("n", "<leader>cqr", runner.run_cell, { desc = "Run cell" })
+		vim.keymap.set("n", "<leader>cqa", runner.run_above, { desc = "Run above" })
+		vim.keymap.set("n", "<leader>cqR", runner.run_all, { desc = "Run all" })
+		vim.keymap.set("n", "<leader>cql", runner.run_line, { desc = "Run line" })
+		vim.keymap.set("v", "<leader>cqv", runner.run_range, { desc = "Run visual" })
+
+		-- REPL (iron)
+		vim.keymap.set("n", "<leader>cqs", function()
+			if vim.bo.filetype == "quarto" then
+				require("iron.core").repl_for("python")
+			else
+				require("iron.core").repl_for(vim.bo.filetype)
+			end
+		end, { desc = "Start REPL" })
+	end,
+})
