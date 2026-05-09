@@ -116,38 +116,57 @@ vim.o.timeoutlen = 300
 vim.api.nvim_create_autocmd("VimEnter", {
 	callback = function()
 		local wk = require("which-key")
+
 		wk.setup()
 
 		wk.add({
+			-- Groups
 			{ "<leader>c",        group = "[C]ode" },
-			{ "<leader>c_",       hidden = true },
-			{ "<leader>cq",       group = "[Q]uarto" },
 			{ "<leader>d",        group = "[D]ocument" },
-			{ "<leader>d_",       hidden = true },
 			{ "<leader>g",        group = "[G]rep replace" },
-			{ "<leader>g_",       hidden = true },
 			{ "<leader>h",        group = "Git [H]unk" },
-			{ "<leader>h_",       hidden = true },
-			{ "<leader>o",        group = "[O]rg-mode" },
-			{ "<leader>o_",       hidden = true },
+			{ "<leader>n",        group = "[N]otebook" },
+			{ "<leader>x",        group = "REPL" },
 			{ "<leader>p",        group = "[P]ackages" },
-			{ "<leader>p_",       hidden = true },
 			{ "<leader>r",        group = "[R]ename" },
-			{ "<leader>r_",       hidden = true },
 			{ "<leader>s",        group = "[S]earch" },
-			{ "<leader>s_",       hidden = true },
 			{ "<leader>t",        group = "[T]oggle" },
+
+			-- Hidden placeholders
+			{ "<leader>c_",       hidden = true },
+			{ "<leader>d_",       hidden = true },
+			{ "<leader>g_",       hidden = true },
+			{ "<leader>h_",       hidden = true },
+			{ "<leader>n_",       hidden = true },
+			{ "<leader>x_",       hidden = true },
+			{ "<leader>p_",       hidden = true },
+			{ "<leader>r_",       hidden = true },
+			{ "<leader>s_",       hidden = true },
 			{ "<leader>t_",       hidden = true },
+
+			-- General
 			{ "<leader><leader>", desc = "Find buffers" },
 			{ "<leader>e",        desc = "Toggle file explorer" },
 			{ "<leader>q",        desc = "[Q]uit window" },
-			{ "<leader>tt",       desc = "[T]oggle [T]erminal" },
+			{ "<leader>tt",       desc = "[T]oggle terminal" },
 			{ "<leader>rr",       desc = "[R]eload config" },
 			{ "<leader>w",        desc = "[W]rite file" },
-			{
-				mode = { "n", "v" },
-				{ "<leader>h", group = "Git [H]unk" },
-			},
+
+			-- Notebook / Quarto
+			{ "<leader>nr",       desc = "Run cell" },
+			{ "<leader>na",       desc = "Run above" },
+			{ "<leader>nA",       desc = "Run all" },
+			{ "<leader>np",       desc = "Preview notebook" },
+			{ "<leader>nv",       desc = "Run visual selection", mode = "v" },
+
+			-- Iron / REPL
+			{ "<leader>xx",       desc = "Open REPL" },
+			{ "<leader>xi",       desc = "Focus REPL" },
+			{ "<leader>xq",       desc = "Close REPL" },
+			{ "<leader>xs",       desc = "Send motion/selection" },
+			{ "<leader>xl",       desc = "Send line" },
+			{ "<leader>xf",       desc = "Send file" },
+			{ "<leader>xu",       desc = "Send until cursor" },
 		})
 	end,
 })
@@ -510,6 +529,7 @@ vim.opt.foldmethod = "expr"
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 vim.opt.foldlevel = 99
 
+
 -- ========================================
 -- IRON.NVIM (REPL RUNNER)
 -- ========================================
@@ -517,89 +537,104 @@ local iron = require("iron.core")
 
 iron.setup({
 	config = {
+		scratch_repl = true,
+
 		repl_definition = {
 			python = {
-				command = { "python3" },
+				command = { "ipython", "--no-autoindent" },
 			},
+
 			r = {
 				command = { "R" },
 			},
+
 			julia = {
 				command = { "julia" },
 			},
+
 			sh = {
 				command = { "bash" },
 			},
 		},
+
 		repl_open_cmd = require("iron.view").split.vertical.botright(0.4),
 	},
+
 	keymaps = {
-		send_motion = "<space>sc",
-		visual_send = "<space>sc",
-		send_file = "<space>sf",
-		send_line = "<space>sl",
+		send_motion = "<leader>xs",
+		visual_send = "<leader>xs",
+		send_file = "<leader>xf",
+		send_line = "<leader>xl",
+		send_until_cursor = "<leader>xu",
 	},
+
+	highlight = {
+		italic = true,
+	},
+
+	ignore_blank_lines = true,
 })
 
 -- ========================================
 -- QUARTO
 -- ========================================
-vim.api.nvim_create_autocmd("FileType", {
-	pattern = { "quarto", "rmd" },
-	callback = function()
-		pcall(vim.cmd, "packadd quarto-nvim")
+local quarto = require("quarto")
+quarto.setup({
+	debug = false,
+	closePreviewOnExit = true,
 
-		local ok, quarto = pcall(require, "quarto")
-		if not ok then
-			return
-		end
+	lspFeatures = {
+		enabled = true,
+		chunks = "curly",
 
-		quarto.setup({
-			debug = false,
-			closePreviewOnExit = true,
-			lspFeatures = {
-				enabled = true,
-				chunks = "curly",
-				languages = { "r", "python", "julia", "bash", "html" },
-				diagnostics = {
-					enabled = true,
-					triggers = { "BufWritePost" },
-				},
-				completion = {
-					enabled = true,
-				},
-			},
-			codeRunner = {
-				enabled = true,
-				default_method = "iron", -- CHANGE THIS
-				ft_runners = {
-					python = "iron",
-				},
-				never_run = { "yaml" },
-			},
-		})
+		languages = {
+			"python",
+			"r",
+			"julia",
+			"bash",
+			"html",
+		},
 
-		local runner = require("quarto.runner")
+		diagnostics = {
+			enabled = true,
+			triggers = { "BufWritePost" },
+		},
 
-		-- Preview
-		vim.keymap.set("n", "<leader>cqp", require("quarto").quartoPreview, {
-			desc = "Quarto preview",
-		})
+		completion = {
+			enabled = true,
+		},
+	},
 
-		-- Execution
-		vim.keymap.set("n", "<leader>cqr", runner.run_cell, { desc = "Run cell" })
-		vim.keymap.set("n", "<leader>cqa", runner.run_above, { desc = "Run above" })
-		vim.keymap.set("n", "<leader>cqR", runner.run_all, { desc = "Run all" })
-		vim.keymap.set("n", "<leader>cql", runner.run_line, { desc = "Run line" })
-		vim.keymap.set("v", "<leader>cqv", runner.run_range, { desc = "Run visual" })
+	codeRunner = {
+		enabled = true,
+		default_method = "iron",
 
-		-- REPL (iron)
-		vim.keymap.set("n", "<leader>cqs", function()
-			if vim.bo.filetype == "quarto" then
-				require("iron.core").repl_for("python")
-			else
-				require("iron.core").repl_for(vim.bo.filetype)
-			end
-		end, { desc = "Start REPL" })
-	end,
+		ft_runners = {
+			python = "iron",
+		},
+
+		never_run = { "yaml" },
+	},
+})
+
+local runner = require("quarto.runner")
+
+vim.keymap.set("n", "<leader>nr", runner.run_cell, {
+	desc = "[N]otebook Run cell",
+})
+
+vim.keymap.set("n", "<leader>na", runner.run_above, {
+	desc = "[N]otebook Run above",
+})
+
+vim.keymap.set("n", "<leader>nA", runner.run_all, {
+	desc = "[N]otebook Run all",
+})
+
+vim.keymap.set("n", "<leader>np", quarto.quartoPreview, {
+	desc = "[N]otebook Preview",
+})
+
+vim.keymap.set("v", "<leader>nv", runner.run_range, {
+	desc = "[N]otebook Run visual",
 })
