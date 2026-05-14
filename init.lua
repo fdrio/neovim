@@ -22,6 +22,9 @@ vim.opt.cursorline = true
 -- eol = '↵'
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣', }
 vim.opt.hlsearch = true
+vim.opt.undofile = true
+vim.opt.undodir = vim.fn.stdpath("state") .. "/undo"
+vim.fn.mkdir(vim.opt.undodir:get()[1], "p")
 -- Spelling
 vim.opt.spell = true
 vim.opt.spelllang = 'en_us'
